@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, count, to_timestamp, desc
+from pyspark.sql.functions import hour, col, count, to_timestamp, desc
 
 # import all necesary libraries
 import numpy as np
@@ -38,7 +38,7 @@ spark = SparkSession.builder \
     .getOrCreate()
 
 # Veriyi yükle
-df = spark.read.csv("US_Accidents_March23.csv", header=True)
+df = spark.read.csv("US_Accidents_March23.csv", header=True, inferSchema=True)
 
 # Kolon ve satır sayısını kontrol et
 print("The Dataset Contains, Rows: {:,d} & Columns: {}".format(df.count(), len(df.columns)))
@@ -46,6 +46,7 @@ print("The Dataset Contains, Rows: {:,d} & Columns: {}".format(df.count(), len(d
 # Tarih saat sütunlarını dönüştür
 df = df.withColumn("Start_Time", to_timestamp(col("Start_Time")))
 df = df.withColumn("End_Time", to_timestamp(col("End_Time")))
+"""
 
 # Şehirler ve kaza sayıları
 city_df = df.groupBy("City").agg(count("*").alias("Cases")).orderBy(col("Cases").desc())
@@ -65,7 +66,6 @@ top_10_citiesPD = top_10_cities.toPandas()
 city_dfPd = city_df.toPandas()
 
 ########################################################################################################################
-"""
 fig, ax = plt.subplots(figsize=(12, 7), dpi=80)
 
 cmap = cm.get_cmap('rainbow', 10)
@@ -103,6 +103,10 @@ plt.show()
 """
 
 ########################################################################################################################
+########################################################################################################################
+########################################################################################################################
+
+"""
 
 # create a dictionary using US State code and their corresponding Name
 us_states = {'AK': 'Alaska',
@@ -225,9 +229,95 @@ ax.tick_params(axis='y', which='major', labelsize=10.6)
 ax.tick_params(axis='x', which='major', labelsize=10.6, rotation=10)
 
 plt.show()
+"""
+########################################################################################################################
+########################################################################################################################
+########################################################################################################################
+'''
+severity_df = df.groupBy("Severity").agg(count("*").alias("Cases")).orderBy(col("Cases").desc())
+# Pandas'a dönüşüm
+severity_df_pd = severity_df.toPandas()
 
 ########################################################################################################################
 
+fig = go.Figure(go.Funnelarea(
+    text = ["Severity - 2","Severity - 3", "Severity - 4", "Severity - 1"],
+    values = severity_df_pd.Cases,
+    title = {"position": "top center",
+             "text": "<b>Impact on the Traffic due to the Accidents</b>",
+             'font':dict(size=18,color="#7f7f7f")},
+    marker = {"colors": ['#14a3ee', '#b4e6ee', '#fdf4b8', '#ff4f4e'],
+                "line": {"color": ["#e8e8e8", "wheat", "wheat", "wheat"], "width": [7, 0, 0, 2]}}
+    ))
+
+fig.show()
+'''
+########################################################################################################################
+########################################################################################################################
+########################################################################################################################
+
+# Start_Time sütunundaki saat bilgilerini çıkarma
+df_hours = df.withColumn("Hours", hour(col("Start_Time")))
+
+# Saat bazında kaza sayısını hesaplama
+hour_df = df_hours.groupBy("Hours").agg(count("*").alias("Cases")).orderBy("Hours")
+hour_df_pd = hour_df.toPandas()
+
+########################################################################################################################
+fig, ax = plt.subplots(figsize=(12, 6), dpi=80)
+
+clrs = []
+for x in hour_df_pd['Cases']:
+    if int(hour_df_pd[hour_df_pd['Cases'] == x]['Hours']) <= 11:
+        if (x == max(list(hour_df_pd['Cases'])[:12])):
+            clrs.append('grey')
+        else:
+            clrs.append('#05ffda')
+    else:
+        if (x == max(list(hour_df_pd['Cases'])[12:])):
+            clrs.append('grey')
+        else:
+            clrs.append('#2426b3')
+ax = sns.barplot(y=hour_df_pd['Cases'], x=hour_df_pd['Hours'], palette=clrs)
+ax1 = ax.twinx()
+
+sns.lineplot(data=hour_df_pd, marker='o', x='Hours', y='Cases', color='white', alpha=1)
+
+total = df.count()
+for i in ax.patches:
+    ax.text(i.get_x(), i.get_height() + 1000, \
+            str(round((i.get_height() / total) * 100, 2)) + '%', fontsize=10,
+            color='black')
+
+plt.ylim(1000, 150000)
+plt.title('\nRoad Accident Percentage \nfor different hours along the day\n', size=20, color='grey')
+
+ax1.axes.yaxis.set_visible(False)
+ax.set_xlabel('\nHours\n', fontsize=15, color='grey')
+ax.set_ylabel('\nAccident Cases\n', fontsize=15, color='grey')
+
+for i in ['bottom', 'top', 'left', 'right']:
+    ax.spines[i].set_color('white')
+    ax.spines[i].set_linewidth(1.5)
+    ax1.spines[i].set_color('white')
+    ax1.spines[i].set_linewidth(1.5)
+
+ax.set_axisbelow(True)
+ax.grid(color='#b2d6c7', linewidth=1, alpha=.3)
+ax.tick_params(axis='both', which='major', labelsize=12)
+
+MA = mpatches.Patch(color='grey', label='Hour with Maximum\n no. of Road Accidents')
+MO = mpatches.Patch(color='#05ffda', label='Monrning Hours')
+NI = mpatches.Patch(color='#2426b3', label='Night Hours')
+
+ax.legend(handles=[MA, MO, NI], prop={'size': 10.5}, loc='upper left', borderpad=1, edgecolor='white');
+
+plt.show()
+fig.show()
+
+########################################################################################################################
+########################################################################################################################
+########################################################################################################################
 
 
 # Spark Session'ı kapat
