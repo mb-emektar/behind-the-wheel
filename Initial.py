@@ -46,8 +46,7 @@ print("The Dataset Contains, Rows: {:,d} & Columns: {}".format(df.count(), len(d
 # Tarih saat sütunlarını dönüştür
 df = df.withColumn("Start_Time", to_timestamp(col("Start_Time")))
 df = df.withColumn("End_Time", to_timestamp(col("End_Time")))
-
-
+'''
 # Şehirler ve kaza sayıları
 city_df = df.groupBy("City").agg(count("*").alias("Cases")).orderBy(col("Cases").desc())
 
@@ -64,7 +63,7 @@ top_10_cities.show()
 
 top_10_citiesPD = top_10_cities.toPandas()
 city_dfPd = city_df.toPandas()
-
+'''
 ########################################################################################################################
 # City Analysis
 ''' 
@@ -339,7 +338,7 @@ ax.tick_params(axis='x', which='major', labelsize=10.6, rotation=10)
 plt.show()
 '''
 ########################################################################################################################
-
+'''
 severity_df = df.groupBy("Severity").agg(count("*").alias("Cases")).orderBy(col("Cases").desc())
 # Pandas'a dönüşüm
 severity_df_pd = severity_df.toPandas()
@@ -349,7 +348,7 @@ fig, ax = plt.subplots(figsize=(12, 10), dpi=150)
 # Toplam vakaların yüzdesini hesaplayalım
 total_cases = severity_df_pd['Cases'].sum()
 severity_df_pd['Percentage'] = (severity_df_pd['Cases'] / total_cases) * 100
-clrs = ['#b4e6ee','#14a3ee','#fdf4b8','#ff4f4e']
+clrs = ['#b4e6ee', '#14a3ee', '#fdf4b8', '#ff4f4e']
 
 ax = sns.barplot(x=severity_df_pd['Severity'], y=severity_df_pd['Percentage'], palette=clrs)
 
@@ -374,12 +373,47 @@ for p in ax.patches:
     width = p.get_width()
     height = p.get_height()
     x, y = p.get_xy()
-    ax.annotate(f'{height:.2f}%', (x + width/2, y + height*1.02), ha='center')
+    ax.annotate(f'{height:.2f}%', (x + width / 2, y + height * 1.02), ha='center')
 
 fig.show()
-
+'''
 ########################################################################################################################
 
+# Road Condition Analysis
+fig, ((ax1, ax2), (ax3, ax4), (ax5, ax6), (ax7, ax8)) = plt.subplots(nrows=4, ncols=2, figsize=(16, 20))
+
+road_conditions = ['Bump', 'Crossing', 'Give_Way', 'Junction', 'Stop', 'No_Exit', 'Traffic_Signal', 'Turning_Loop']
+colors = [('#004B95', '#519DE9'), ('#38812F', '#7CC674'), ('#005F60', '#73C5C5'), ('#7D1007', '#C9190B'),
+          ('#C58C00', '#F4C145'),
+          ('#C46100', '#EF9234'), ('#3C3D99', '#8481DD'), ('#6A6E73', '#B8BBBE')]
+index = 0
+
+
+def func(pct, allvals):
+    absolute = int(round(pct / 100 * np.sum(allvals), 2))
+    return "{:.2f}%\n({:,d} Cases)".format(pct, absolute)
+
+
+for i in [ax1, ax2, ax3, ax4, ax5, ax6, ax7, ax8]:
+
+    road_conditions_count = df.groupBy(road_conditions[index]).agg(count("*").alias("Count"))
+    size = list(road_conditions_count.toPandas()["Count"])
+
+    if len(size) != 2:
+        size.append(0)
+
+    labels = ['True', 'False']
+
+    i.pie(size, labels=labels, colors=colors[index],
+          autopct=lambda pct: func(pct, size), labeldistance=1.1,
+          textprops={'fontsize': 12}, explode=[0, 0.2])
+
+    title = '\nPresence of {}'.format(road_conditions[index])
+
+    i.set_title(title, fontsize=18, color='grey')
+
+    index += 1
+fig.show()
 
 # Spark Session'ı kapat
 spark.stop()
