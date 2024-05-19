@@ -46,7 +46,7 @@ print("The Dataset Contains, Rows: {:,d} & Columns: {}".format(df.count(), len(d
 # Tarih saat sütunlarını dönüştür
 df = df.withColumn("Start_Time", to_timestamp(col("Start_Time")))
 df = df.withColumn("End_Time", to_timestamp(col("End_Time")))
-"""
+
 
 # Şehirler ve kaza sayıları
 city_df = df.groupBy("City").agg(count("*").alias("Cases")).orderBy(col("Cases").desc())
@@ -66,7 +66,9 @@ top_10_citiesPD = top_10_cities.toPandas()
 city_dfPd = city_df.toPandas()
 
 ########################################################################################################################
-fig, ax = plt.subplots(figsize=(12, 7), dpi=80)
+# City Analysis
+
+fig, ax = plt.subplots(figsize=(12, 10), dpi=150)
 
 cmap = cm.get_cmap('rainbow', 10)
 clrs = [matplotlib.colors.rgb2hex(cmap(i)) for i in range(cmap.N)]
@@ -86,7 +88,7 @@ plt.xticks(rotation=10, fontsize=12)
 plt.yticks(fontsize=12)
 
 ax.set_xlabel('\nCities\n', fontsize=15, color='grey')
-ax.set_ylabel('\nAccident Cases\n', fontsize=15, color='grey')
+ax.set_ylabel('\nNumber of Accident Cases\n', fontsize=15, color='grey')
 
 for i in ['bottom', 'left']:
     ax.spines[i].set_color('white')
@@ -100,10 +102,116 @@ top_side.set_visible(False)
 ax.set_axisbelow(True)
 ax.grid(color='#b2d6c7', linewidth=1, axis='y', alpha=.3)
 plt.show()
-"""
+
 
 ########################################################################################################################
+# Hour Analysis
+
+# Start_Time sütunundaki saat bilgilerini çıkarma
+df_hours = df.withColumn("Hours", hour(col("Start_Time")))
+
+# Saat bazında kaza sayısını hesaplama
+hour_df = df_hours.groupBy("Hours").agg(count("*").alias("Cases")).orderBy("Hours")
+hour_df_pd = hour_df.toPandas()
+
+fig, ax = plt.subplots(figsize=(12, 10), dpi=150)
+
+clrs = []
+for x in hour_df_pd['Cases']:
+    if int(hour_df_pd[hour_df_pd['Cases'] == x]['Hours']) <= 11:
+        if (x == max(list(hour_df_pd['Cases'])[:12])):
+            clrs.append('red')
+        else:
+            clrs.append('#17c4e3')
+    else:
+        if (x == max(list(hour_df_pd['Cases'])[12:])):
+            clrs.append('red')
+        else:
+            clrs.append('#1717e3')
+ax = sns.barplot(y=hour_df_pd['Cases'], x=hour_df_pd['Hours'], palette=clrs)
+ax1 = ax.twinx()
+
+sns.lineplot(data=hour_df_pd, marker='o', x='Hours', y='Cases', color='white', alpha=1)
+
+total = df.count()
+for i in ax.patches:
+    ax.text(i.get_x(), i.get_height() + 1000, \
+            str(round((i.get_height() / total) * 100, 2)) + '%', fontsize=10,
+            color='black')
+
+plt.ylim(1000, 150000)
+plt.title('\nRoad Accident Percentage \nfor different hours along the day\n', size=20, color='grey')
+
+ax1.axes.yaxis.set_visible(False)
+ax.set_xlabel('\nHours\n', fontsize=15, color='grey')
+ax.set_ylabel('\nNumber of Accident Cases\n', fontsize=15, color='grey')
+
+for i in ['bottom', 'top', 'left', 'right']:
+    ax.spines[i].set_color('white')
+    ax.spines[i].set_linewidth(1.5)
+    ax1.spines[i].set_color('white')
+    ax1.spines[i].set_linewidth(1.5)
+
+ax.set_axisbelow(True)
+ax.grid(color='#b2d6c7', linewidth=1, alpha=.3)
+ax.tick_params(axis='both', which='major', labelsize=12)
+
+MA = mpatches.Patch(color='red', label='Hours with maximum\nnumber of accidents')
+MO = mpatches.Patch(color='#17c4e3', label='A.M.')
+NI = mpatches.Patch(color='#1717e3', label='P.M.')
+
+ax.legend(handles=[MA, MO, NI], prop={'size': 10.5}, loc='upper left', borderpad=1, edgecolor='white');
+
+plt.show()
+
 ########################################################################################################################
+''' 
+# sparksız yapılan usa map severity grafiği
+
+df = pd.read_csv('./US_Accidents_March23.csv')
+
+print('The Dataset Contains, Rows: {:,d} & Columns: {}'.format(df.shape[0], df.shape[1]))
+
+states = gpd.read_file('./us-states-map')
+df.Start_Time = pd.to_datetime(df.Start_Time, format='mixed')
+
+
+df.End_Time = pd.to_datetime(df.End_Time, format='mixed')
+
+geometry = [Point(xy) for xy in zip(df['Start_Lng'], df['Start_Lat'])]
+geo_df = gpd.GeoDataFrame(df, geometry=geometry)
+
+fig, ax = plt.subplots(figsize=(15,15))
+ax.set_xlim([-125,-65])
+ax.set_ylim([22,55])
+states.boundary.plot(ax=ax, color='black');
+
+geo_df[geo_df['Severity'] == 1].plot(ax=ax, markersize=50, color='#5cff4a', marker='o', label='Severity 1');
+geo_df[geo_df['Severity'] == 3].plot(ax=ax, markersize=10, color='#ff1c1c', marker='x', label='Severity 3');
+geo_df[geo_df['Severity'] == 4].plot(ax=ax, markersize=5, color='#6459ff', marker='+', label='Severity 4');
+geo_df[geo_df['Severity'] == 2].plot(ax=ax, markersize=1, color='#ffb340', marker='.', label='Severity 2');
+
+for i in ['bottom', 'top', 'left', 'right']:
+    side = ax.spines[i]
+    side.set_visible(False)
+
+plt.tick_params(top=False, bottom=False, left=False, right=False,
+                labelleft=False, labelbottom=False)
+
+plt.title('\nDifferent level of Severity visualization in US map', size=20, color='grey');
+
+One = mpatches.Patch(color='#5cff4a', label='Severity 1')
+Two = mpatches.Patch(color='#ffb340', label='Severity 2')
+Three = mpatches.Patch(color='#ff1c1c', label='Severity 3')
+Four = mpatches.Patch(color='#6459ff', label='Severity 4')
+
+ax.legend(handles=[One, Two, Three, Four], prop={'size': 15}, loc='lower right', borderpad=1,
+          labelcolor=['#5cff4a', '#ffb340', '#ff1c1c', '#6459ff'], edgecolor='white');
+
+plt.show()
+fig.show()
+
+'''
 ########################################################################################################################
 
 """
@@ -231,14 +339,11 @@ ax.tick_params(axis='x', which='major', labelsize=10.6, rotation=10)
 plt.show()
 """
 ########################################################################################################################
-########################################################################################################################
-########################################################################################################################
 '''
 severity_df = df.groupBy("Severity").agg(count("*").alias("Cases")).orderBy(col("Cases").desc())
 # Pandas'a dönüşüm
 severity_df_pd = severity_df.toPandas()
 
-########################################################################################################################
 
 fig = go.Figure(go.Funnelarea(
     text = ["Severity - 2","Severity - 3", "Severity - 4", "Severity - 1"],
@@ -252,71 +357,6 @@ fig = go.Figure(go.Funnelarea(
 
 fig.show()
 '''
-########################################################################################################################
-########################################################################################################################
-########################################################################################################################
-
-# Start_Time sütunundaki saat bilgilerini çıkarma
-df_hours = df.withColumn("Hours", hour(col("Start_Time")))
-
-# Saat bazında kaza sayısını hesaplama
-hour_df = df_hours.groupBy("Hours").agg(count("*").alias("Cases")).orderBy("Hours")
-hour_df_pd = hour_df.toPandas()
-
-########################################################################################################################
-fig, ax = plt.subplots(figsize=(12, 6), dpi=80)
-
-clrs = []
-for x in hour_df_pd['Cases']:
-    if int(hour_df_pd[hour_df_pd['Cases'] == x]['Hours']) <= 11:
-        if (x == max(list(hour_df_pd['Cases'])[:12])):
-            clrs.append('grey')
-        else:
-            clrs.append('#05ffda')
-    else:
-        if (x == max(list(hour_df_pd['Cases'])[12:])):
-            clrs.append('grey')
-        else:
-            clrs.append('#2426b3')
-ax = sns.barplot(y=hour_df_pd['Cases'], x=hour_df_pd['Hours'], palette=clrs)
-ax1 = ax.twinx()
-
-sns.lineplot(data=hour_df_pd, marker='o', x='Hours', y='Cases', color='white', alpha=1)
-
-total = df.count()
-for i in ax.patches:
-    ax.text(i.get_x(), i.get_height() + 1000, \
-            str(round((i.get_height() / total) * 100, 2)) + '%', fontsize=10,
-            color='black')
-
-plt.ylim(1000, 150000)
-plt.title('\nRoad Accident Percentage \nfor different hours along the day\n', size=20, color='grey')
-
-ax1.axes.yaxis.set_visible(False)
-ax.set_xlabel('\nHours\n', fontsize=15, color='grey')
-ax.set_ylabel('\nAccident Cases\n', fontsize=15, color='grey')
-
-for i in ['bottom', 'top', 'left', 'right']:
-    ax.spines[i].set_color('white')
-    ax.spines[i].set_linewidth(1.5)
-    ax1.spines[i].set_color('white')
-    ax1.spines[i].set_linewidth(1.5)
-
-ax.set_axisbelow(True)
-ax.grid(color='#b2d6c7', linewidth=1, alpha=.3)
-ax.tick_params(axis='both', which='major', labelsize=12)
-
-MA = mpatches.Patch(color='grey', label='Hour with Maximum\n no. of Road Accidents')
-MO = mpatches.Patch(color='#05ffda', label='Monrning Hours')
-NI = mpatches.Patch(color='#2426b3', label='Night Hours')
-
-ax.legend(handles=[MA, MO, NI], prop={'size': 10.5}, loc='upper left', borderpad=1, edgecolor='white');
-
-plt.show()
-fig.show()
-
-########################################################################################################################
-########################################################################################################################
 ########################################################################################################################
 
 
