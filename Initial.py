@@ -67,7 +67,7 @@ city_dfPd = city_df.toPandas()
 
 ########################################################################################################################
 # City Analysis
-
+''' 
 fig, ax = plt.subplots(figsize=(12, 10), dpi=150)
 
 cmap = cm.get_cmap('rainbow', 10)
@@ -103,10 +103,10 @@ ax.set_axisbelow(True)
 ax.grid(color='#b2d6c7', linewidth=1, axis='y', alpha=.3)
 plt.show()
 
-
+'''
 ########################################################################################################################
 # Hour Analysis
-
+''' 
 # Start_Time sütunundaki saat bilgilerini çıkarma
 df_hours = df.withColumn("Hours", hour(col("Start_Time")))
 
@@ -163,7 +163,7 @@ NI = mpatches.Patch(color='#1717e3', label='P.M.')
 ax.legend(handles=[MA, MO, NI], prop={'size': 10.5}, loc='upper left', borderpad=1, edgecolor='white');
 
 plt.show()
-
+'''
 ########################################################################################################################
 ''' 
 # sparksız yapılan usa map severity grafiği
@@ -214,7 +214,7 @@ fig.show()
 '''
 ########################################################################################################################
 
-"""
+'''
 
 # create a dictionary using US State code and their corresponding Name
 us_states = {'AK': 'Alaska',
@@ -294,10 +294,10 @@ state_df['State'] = state_df['State'].apply(convert)
 top_ten_states_name = state_df.head(10)
 
 print(top_ten_states_name)
-
+'''
 ########################################################################################################################
-
-fig, ax = plt.subplots(figsize=(12, 6), dpi=80)
+'''
+fig, ax = plt.subplots(figsize=(12, 10), dpi=150)
 
 cmap = cm.get_cmap('winter', 10)
 clrs = [matplotlib.colors.rgb2hex(cmap(i)) for i in range(cmap.N)]
@@ -337,26 +337,47 @@ ax.tick_params(axis='y', which='major', labelsize=10.6)
 ax.tick_params(axis='x', which='major', labelsize=10.6, rotation=10)
 
 plt.show()
-"""
-########################################################################################################################
 '''
+########################################################################################################################
+
 severity_df = df.groupBy("Severity").agg(count("*").alias("Cases")).orderBy(col("Cases").desc())
 # Pandas'a dönüşüm
 severity_df_pd = severity_df.toPandas()
 
+fig, ax = plt.subplots(figsize=(12, 10), dpi=150)
 
-fig = go.Figure(go.Funnelarea(
-    text = ["Severity - 2","Severity - 3", "Severity - 4", "Severity - 1"],
-    values = severity_df_pd.Cases,
-    title = {"position": "top center",
-             "text": "<b>Impact on the Traffic due to the Accidents</b>",
-             'font':dict(size=18,color="#7f7f7f")},
-    marker = {"colors": ['#14a3ee', '#b4e6ee', '#fdf4b8', '#ff4f4e'],
-                "line": {"color": ["#e8e8e8", "wheat", "wheat", "wheat"], "width": [7, 0, 0, 2]}}
-    ))
+# Toplam vakaların yüzdesini hesaplayalım
+total_cases = severity_df_pd['Cases'].sum()
+severity_df_pd['Percentage'] = (severity_df_pd['Cases'] / total_cases) * 100
+clrs = ['#b4e6ee','#14a3ee','#fdf4b8','#ff4f4e']
+
+ax = sns.barplot(x=severity_df_pd['Severity'], y=severity_df_pd['Percentage'], palette=clrs)
+
+plt.title('\nImpact on the Traffic due to the Accidents\n', size=20, color='grey')
+
+plt.xticks(rotation=10, fontsize=12)
+plt.yticks(fontsize=12)
+
+# Custom tick labels
+custom_labels = ['Severity-1', 'Severity-2', 'Severity-3', 'Severity-4']
+ax.set_xticklabels(custom_labels, rotation=10, fontsize=12)
+
+plt.ylim(0, 100)
+ax.set_xlabel('\nSeverity\n', fontsize=15, color='grey')
+ax.set_ylabel('\nAccident Cases\n', fontsize=15, color='grey')
+
+ax.set_axisbelow(True)
+ax.grid(color='#b2d6c7', linewidth=1, axis='y', alpha=.3)
+
+# Add percentages on top of each bar
+for p in ax.patches:
+    width = p.get_width()
+    height = p.get_height()
+    x, y = p.get_xy()
+    ax.annotate(f'{height:.2f}%', (x + width/2, y + height*1.02), ha='center')
 
 fig.show()
-'''
+
 ########################################################################################################################
 
 
