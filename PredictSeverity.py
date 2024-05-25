@@ -47,19 +47,19 @@ df = df.na.fill({td: median_val})
 max_td = df.agg({"Time_Duration(min)": "max"}).collect()[0][0]
 min_td = df.agg({"Time_Duration(min)": "min"}).collect()[0][0]
 
-print(max_td)
-print(min_td)
-df.printSchema()
-
-
 # Makine öğrenmesi için kullanılacak özellikleri seç
 feature_lst = ['Source','Severity','Start_Lng','Start_Lat','Distance(mi)','City','County','State','Timezone','Temperature(F)','Humidity(%)','Pressure(in)', 'Visibility(mi)', 'Wind_Direction','Weather_Condition','Amenity','Bump','Crossing','Give_Way','Junction','No_Exit','Railway','Roundabout','Station','Stop','Traffic_Calming','Traffic_Signal','Turning_Loop','Sunrise_Sunset','Hour','Weekday', 'Time_Duration(min)']
 
 # Seçilen özellikleri içeren yeni bir DataFrame oluştur
 df_sel = df.select(*feature_lst)
 
-# Yeni DataFrame'in şemasını görüntüle
-df_sel.printSchema()
+# Null değerleri içeren sütunları seç ve bu sütunlardaki satırları sil
+selected_columns = [col_name for col_name in df_sel.columns if df_sel.select(col_name).na.drop().count() != df_sel.count()]
+df_sel = df_sel.dropna(subset=selected_columns)
 
-# İlk 5 satırı görüntüle
-df_sel.show(5)
+# DataFrame'in boyutunu yazdır
+print((df_sel.count(), len(df_sel.columns)))
+
+df_sel.write.csv('file:///./US_Accidents_March23_clean_sel_dropna.csv', header=True, mode='overwrite')
+
+spark.stop()
