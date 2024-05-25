@@ -32,13 +32,13 @@ spark = SparkSession.builder \
 df_sel_dropna = spark.read.csv("US_Accidents_March23_clean_sel_dropna.csv", header=True, inferSchema=True)
 
 # Eyaleti belirle
-state = 'TX'
+state = 'CA'
 
 # Pennsylvania eyaletini seç
 df_state = df_sel_dropna.filter(col('State') == state).drop('State')
 
 # Set county
-county = 'Loving'
+county = 'Alameda'
 
 # Select the county of Pennsylvania
 df_county = df_state.filter(col('County') == county).drop('County')
@@ -78,4 +78,8 @@ evaluator = MulticlassClassificationEvaluator(labelCol=target, predictionCol="pr
 accuracy = evaluator.evaluate(predictions)
 
 print("[Logistic regression algorithm] accuracy_score: {:.3f}".format(accuracy))
+
+
+
+
 spark.stop()
