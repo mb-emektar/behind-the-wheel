@@ -1,65 +1,154 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import hour, col, count, to_timestamp, desc, date_format, dayofmonth, year, round, stddev, \
-    median as spark_median, lit
-import pyspark.sql.functions as F
+from pyspark.sql.functions import col
+
+from pyspark.ml.feature import VectorAssembler
+from pyspark.ml.classification import LogisticRegression, DecisionTreeClassifier, RandomForestClassifier
+from pyspark.ml.evaluation import MulticlassClassificationEvaluator
+
+# Import pandas, matplotlib.pyplot
+import pandas as pd
+import matplotlib.pyplot as plt
+
+pd.set_option('display.max_rows', 200)
+pd.set_option('display.max_columns', 200)
+plt.style.use('ggplot')
 
 import warnings
 
 warnings.filterwarnings('ignore')
 
-# Spark Session oluştur
+# Create Spark Session
 spark = SparkSession.builder \
-    .appName("Predict Severity") \
+    .appName("Predict Severity2") \
     .getOrCreate()
 
-df = spark.read.csv("US_Accidents_March23.csv", header=True, inferSchema=True)
+df_sel_dropna = spark.read.csv("US_Accidents_March23_clean_sel_dropna.csv", header=True, inferSchema=True)
 
-# 'Start_Time' ve 'End_Time' sütunlarını timestamp türüne dönüştür
-df = df.withColumn('Start_Time', to_timestamp(col('Start_Time'))) \
-    .withColumn('End_Time', to_timestamp(col('End_Time')))
+# Choose the state
+state = 'CA'
 
-# Yıl, Ay, Gün, Saat ve Haftanın Günü sütunlarını çıkar
-df = df.withColumn('Year', year(col('Start_Time'))) \
-    .withColumn('Month', date_format(col('Start_Time'), 'MMM')) \
-    .withColumn('Day', dayofmonth(col('Start_Time'))) \
-    .withColumn('Hour', hour(col('Start_Time'))) \
-    .withColumn('Weekday', date_format(col('Start_Time'), 'E'))
+# Choose state as California
+df_state = df_sel_dropna.filter(col('State') == state).drop('State')
 
-# Kaza süresini dakika cinsinden hesapla
-df = df.withColumn('Time_Duration(min)', round((col('End_Time').cast("long") - col('Start_Time').cast("long")) / 60))
+# Set county
+county = 'Alameda'
 
-# Negatif veya sıfır süreleri içeren satırları filtrele ve sil
-df = df.filter(col('Time_Duration(min)') > 0)
-
-# Medyan ve standart sapma hesapla
-td = 'Time_Duration(min)'
-median_val = df.approxQuantile(td, [0.5], 0.01)[0]
-stddev_val = df.select(stddev(col(td))).collect()[0][0]
-
-# Outlier'ları NaN ile değiştir
-df = df.withColumn(td, F.when(F.abs(col(td) - median_val) > stddev_val * 3, None).otherwise(col(td)))
+# Select the county of Alameda
+df_county = df_state.filter(col('County') == county).drop('County')
 
 
-# NaN değerleri medyan ile doldur
-df = df.na.fill({td: median_val})
+df_county.show()
 
-# Kaza süresi bilgilerini yazdır
-max_td = df.agg({"Time_Duration(min)": "max"}).collect()[0][0]
-min_td = df.agg({"Time_Duration(min)": "min"}).collect()[0][0]
 
-# Makine öğrenmesi için kullanılacak özellikleri seç
-feature_lst = ['Source','Severity','Start_Lng','Start_Lat','Distance(mi)','City','County','State','Timezone','Temperature(F)','Humidity(%)','Pressure(in)', 'Visibility(mi)', 'Wind_Direction','Weather_Condition','Amenity','Bump','Crossing','Give_Way','Junction','No_Exit','Railway','Roundabout','Station','Stop','Traffic_Calming','Traffic_Signal','Turning_Loop','Sunrise_Sunset','Hour','Weekday', 'Time_Duration(min)']
+# Convert Apache Spark DataFrame into Pandas DataFrame
+df_county_pd = df_county.toPandas()
 
-# Seçilen özellikleri içeren yeni bir DataFrame oluştur
-df_sel = df.select(*feature_lst)
+# Generate dummies for categorical data
+df_county_dummy_pd = pd.get_dummies(df_county_pd, drop_first=True)
 
-# Null değerleri içeren sütunları seç ve bu sütunlardaki satırları sil
-selected_columns = [col_name for col_name in df_sel.columns if df_sel.select(col_name).na.drop().count() != df_sel.count()]
-df_sel = df_sel.dropna(subset=selected_columns)
+# Assign the data
+df = spark.createDataFrame(df_county_dummy_pd)
 
-# DataFrame'in boyutunu yazdır
-print((df_sel.count(), len(df_sel.columns)))
+# Show dataframe info
+df.show()
 
-df_sel.write.csv('file:///./US_Accidents_March23_clean_sel_dropna.csv', header=True, mode='overwrite')
+# Set the target for the prediction
+target = 'Severity'
+
+# Combine features as vector
+feature_columns = [col for col in df.columns if col != target]
+assembler = VectorAssembler(inputCols=feature_columns, outputCol="features")
+df_assembled = assembler.transform(df)
+
+# Split data into train and test data
+(train_data, test_data) = df_assembled.randomSplit([0.8, 0.2], seed=21)
+
+# Create evaluator
+evaluator = MulticlassClassificationEvaluator(labelCol=target, predictionCol="prediction")
+
+########################################################################################################################
+########################################################################################################################
+# Logistic Regression Model
+
+# Create and fit Logistic Regression Model
+lr = LogisticRegression(featuresCol="features", labelCol=target)
+lr_model = lr.fit(train_data)
+
+# Make predictions on test data
+predictions = lr_model.transform(test_data)
+
+# Calculate scores
+accuracy = evaluator.evaluate(predictions, {evaluator.metricName: "accuracy"})
+precision = evaluator.evaluate(predictions, {evaluator.metricName: "weightedPrecision"})
+recall = evaluator.evaluate(predictions, {evaluator.metricName: "weightedRecall"})
+f1 = evaluator.evaluate(predictions, {evaluator.metricName: "f1"})
+
+print("[Logistic regression algorithm] accuracy_score: {:.3f}".format(accuracy))
+print("[Logistic regression algorithm] precision_score: {:.3f}".format(precision))
+print("[Logistic regression algorithm] recall_score: {:.3f}".format(recall))
+print("[Logistic regression algorithm] f1_score: {:.3f}".format(f1))
+
+########################################################################################################################
+########################################################################################################################
+# Decision Tree Model
+
+# Create and fit Decision Tree Model
+dt = DecisionTreeClassifier(labelCol="Severity", featuresCol="features")
+dt_model = dt.fit(train_data)
+
+# Make predictions on test data
+dt_predictions = dt_model.transform(test_data)
+
+# Calculate scores
+dt_accuracy = evaluator.evaluate(dt_predictions, {evaluator.metricName: "accuracy"})
+dt_precision = evaluator.evaluate(dt_predictions, {evaluator.metricName: "weightedPrecision"})
+dt_recall = evaluator.evaluate(dt_predictions, {evaluator.metricName: "weightedRecall"})
+dt_f1 = evaluator.evaluate(dt_predictions, {evaluator.metricName: "f1"})
+
+print("[Decision Tree algorithm] accuracy_score: {:.3f}".format(dt_accuracy))
+print("[Decision Tree algorithm] precision_score: {:.3f}".format(dt_precision))
+print("[Decision Tree algorithm] recall_score: {:.3f}".format(dt_recall))
+print("[Decision Tree algorithm] f1_score: {:.3f}".format(dt_f1))
+
+# Get feature importances for decision tree
+feature_importances = dt_model.featureImportances.toArray()
+
+# Print feature importances for decision tree
+feature_importance_list = sorted(zip(feature_columns, feature_importances), key=lambda x: x[1], reverse=True)[:10]
+print("Feature Importances for decision tree:")
+for feature, importance in feature_importance_list:
+    print(f"{feature}: {importance}")
+
+########################################################################################################################
+########################################################################################################################
+# Random Forest Model
+
+# Create and fit Random Forest Model
+rf = RandomForestClassifier(labelCol="Severity", featuresCol="features", numTrees=100)
+rf_model = rf.fit(train_data)
+
+# Make predictions on test data
+rf_predictions = rf_model.transform(test_data)
+
+# Calculate scores
+rf_accuracy = evaluator.evaluate(rf_predictions, {evaluator.metricName: "accuracy"})
+rf_precision = evaluator.evaluate(rf_predictions, {evaluator.metricName: "weightedPrecision"})
+rf_recall = evaluator.evaluate(rf_predictions, {evaluator.metricName: "weightedRecall"})
+rf_f1 = evaluator.evaluate(rf_predictions, {evaluator.metricName: "f1"})
+
+print("[Random Forest algorithm] accuracy_score: {:.3f}".format(rf_accuracy))
+print("[Random Forest algorithm] precision_score: {:.3f}".format(rf_precision))
+print("[Random Forest algorithm] recall_score: {:.3f}".format(rf_recall))
+print("[Random Forest algorithm] f1_score: {:.3f}".format(rf_f1))
+
+# Get feature importances
+feature_importances = rf_model.featureImportances.toArray()
+
+# Print feature importances
+feature_importance_list = sorted(zip(feature_columns, feature_importances), key=lambda x: x[1], reverse=True)[:10]
+print("Feature Importances:")
+for feature, importance in feature_importance_list:
+    print(f"{feature}: {importance}")
+
 
 spark.stop()
