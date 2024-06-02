@@ -46,33 +46,34 @@ print("The Dataset Contains, Rows: {:,d} & Columns: {}".format(df.count(), len(d
 # Tarih saat sütunlarını dönüştür
 df = df.withColumn("Start_Time", to_timestamp(col("Start_Time")))
 df = df.withColumn("End_Time", to_timestamp(col("End_Time")))
+
+
+########################################################################################################################
+# City Analysis
 '''
-# Şehirler ve kaza sayıları
+# Cities and number of accidents
 city_df = df.groupBy("City").agg(count("*").alias("Cases")).orderBy(col("Cases").desc())
 
-# En yüksek kaza sayısı ve hesaplamaları
+# Highest number of accidents and calculations
 highest_cases = city_df.select("Cases").first()[0]
 print(round(highest_cases / 5))
 print(round(highest_cases / (5 * 365)))
 
-# Top 10 şehir
+# Top 10 cities
 top_10_cities = city_df.limit(10)
 
-# Sonuçları görüntüle
+# show reslults
 top_10_cities.show()
 
 top_10_citiesPD = top_10_cities.toPandas()
 city_dfPd = city_df.toPandas()
-'''
-########################################################################################################################
-# City Analysis
-''' 
+
 fig, ax = plt.subplots(figsize=(12, 10), dpi=150)
 
 cmap = cm.get_cmap('rainbow', 10)
 clrs = [matplotlib.colors.rgb2hex(cmap(i)) for i in range(cmap.N)]
 
-ax = sns.barplot(y=top_10_citiesPD['Cases'], x=top_10_citiesPD['City'], palette='rainbow')
+ax = sns.barplot(y=top_10_citiesPD['Cases'], x=top_10_citiesPD['City'], palette='plasma')
 
 total = sum(city_dfPd['Cases'])
 for i in ax.patches:
@@ -101,15 +102,15 @@ top_side.set_visible(False)
 ax.set_axisbelow(True)
 ax.grid(color='#b2d6c7', linewidth=1, axis='y', alpha=.3)
 plt.show()
-
 '''
+
 ########################################################################################################################
 # Hour Analysis
-''' 
-# Start_Time sütunundaki saat bilgilerini çıkarma
+'''
+# Extract time information from the Start_Time column
 df_hours = df.withColumn("Hours", hour(col("Start_Time")))
 
-# Saat bazında kaza sayısını hesaplama
+# Calculating the number of accidents per hour
 hour_df = df_hours.groupBy("Hours").agg(count("*").alias("Cases")).orderBy("Hours")
 hour_df_pd = hour_df.toPandas()
 
@@ -121,12 +122,12 @@ for x in hour_df_pd['Cases']:
         if (x == max(list(hour_df_pd['Cases'])[:12])):
             clrs.append('red')
         else:
-            clrs.append('#17c4e3')
+            clrs.append('#c3b632')
     else:
         if (x == max(list(hour_df_pd['Cases'])[12:])):
             clrs.append('red')
         else:
-            clrs.append('#1717e3')
+            clrs.append('#60154a')
 ax = sns.barplot(y=hour_df_pd['Cases'], x=hour_df_pd['Hours'], palette=clrs)
 ax1 = ax.twinx()
 
@@ -156,16 +157,16 @@ ax.grid(color='#b2d6c7', linewidth=1, alpha=.3)
 ax.tick_params(axis='both', which='major', labelsize=12)
 
 MA = mpatches.Patch(color='red', label='Hours with maximum\nnumber of accidents')
-MO = mpatches.Patch(color='#17c4e3', label='A.M.')
-NI = mpatches.Patch(color='#1717e3', label='P.M.')
+MO = mpatches.Patch(color='#c3b632', label='A.M.')
+NI = mpatches.Patch(color='#60154a', label='P.M.')
 
 ax.legend(handles=[MA, MO, NI], prop={'size': 10.5}, loc='upper left', borderpad=1, edgecolor='white');
 
 plt.show()
 '''
 ########################################################################################################################
-''' 
-# sparksız yapılan usa map severity grafiği
+'''  
+# usa map severity graph made without spark
 
 df = pd.read_csv('./US_Accidents_March23.csv')
 
@@ -173,48 +174,46 @@ print('The Dataset Contains, Rows: {:,d} & Columns: {}'.format(df.shape[0], df.s
 
 states = gpd.read_file('./us-states-map')
 df.Start_Time = pd.to_datetime(df.Start_Time, format='mixed')
-
-
 df.End_Time = pd.to_datetime(df.End_Time, format='mixed')
 
 geometry = [Point(xy) for xy in zip(df['Start_Lng'], df['Start_Lat'])]
 geo_df = gpd.GeoDataFrame(df, geometry=geometry)
 
-fig, ax = plt.subplots(figsize=(15,15))
-ax.set_xlim([-125,-65])
-ax.set_ylim([22,55])
-states.boundary.plot(ax=ax, color='black');
+fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(nrows=2, ncols=2, figsize=(15, 10), dpi=150)
+ax = [ax1,ax2,ax3,ax4]
+#fig, ax = plt.subplots(figsize=
 
-geo_df[geo_df['Severity'] == 1].plot(ax=ax, markersize=50, color='#5cff4a', marker='o', label='Severity 1');
-geo_df[geo_df['Severity'] == 3].plot(ax=ax, markersize=10, color='#ff1c1c', marker='x', label='Severity 3');
-geo_df[geo_df['Severity'] == 4].plot(ax=ax, markersize=5, color='#6459ff', marker='+', label='Severity 4');
-geo_df[geo_df['Severity'] == 2].plot(ax=ax, markersize=1, color='#ffb340', marker='.', label='Severity 2');
+index = 0
+severity_levels = ['Severity 1','Severity 2','Severity 3','Severity 4']
+severity_colors = ['#00FF00','#0640FF','#5705FF','#FF001E']
 
-for i in ['bottom', 'top', 'left', 'right']:
-    side = ax.spines[i]
-    side.set_visible(False)
+for i in ax:
 
-plt.tick_params(top=False, bottom=False, left=False, right=False,
-                labelleft=False, labelbottom=False)
+    i.set_xlim([-125,-65])
+    i.set_ylim([22,55])
 
-plt.title('\nDifferent level of Severity visualization in US map', size=20, color='grey');
+    states.boundary.plot(ax=i, color='black')
 
-One = mpatches.Patch(color='#5cff4a', label='Severity 1')
-Two = mpatches.Patch(color='#ffb340', label='Severity 2')
-Three = mpatches.Patch(color='#ff1c1c', label='Severity 3')
-Four = mpatches.Patch(color='#6459ff', label='Severity 4')
+    geo_df[geo_df['Severity'] == (index+1)].plot(ax=i, markersize=1, color=severity_colors[index], marker='.', label=severity_levels[index])
 
-ax.legend(handles=[One, Two, Three, Four], prop={'size': 15}, loc='lower right', borderpad=1,
-          labelcolor=['#5cff4a', '#ffb340', '#ff1c1c', '#6459ff'], edgecolor='white');
+    for x in ['bottom', 'top', 'left', 'right']:
+        side = i.spines[x]
+        side.set_visible(False)
 
-plt.show()
+    title = '\n{} Visualization in US Map'.format(severity_levels[index])
+
+    i.set_title(title, fontsize=18, color='grey')
+
+    index += 1
+
+
 fig.show()
-
 '''
+
 ########################################################################################################################
 
+# State Analysis
 '''
-
 # create a dictionary using US State code and their corresponding Name
 us_states = {'AK': 'Alaska',
              'AL': 'Alabama',
@@ -274,36 +273,33 @@ us_states = {'AK': 'Alaska',
              'WY': 'Wyoming'
              }
 
-# Eyaletler ve karşılık gelen kaza sayılarından oluşan bir DataFrame oluşturma
+# Create a DataFrame with states and the corresponding number of accidents
 state_df = df.groupBy("State").agg(count("*").alias("Cases")) \
     .orderBy(desc("Cases")) \
     .select(col("State"), col("Cases")) \
     .toPandas()
 
 
-# Eyalet kodlarını isimlerine dönüştüren bir fonksiyon tanımlama
+# Define a function that converts state codes to their names
 def convert(state_code):
     return us_states.get(state_code, state_code)
 
 
-# Eyalet kodlarını isimlerine dönüştürme
+# Convert state codes to their names
 state_df['State'] = state_df['State'].apply(convert)
 
-# Top 10 eyalet ismini alın
+# Get the top 10 state names
 top_ten_states_name = state_df.head(10)
 
 print(top_ten_states_name)
-'''
-########################################################################################################################
-'''
+
 fig, ax = plt.subplots(figsize=(12, 10), dpi=150)
 
 cmap = cm.get_cmap('winter', 10)
 clrs = [matplotlib.colors.rgb2hex(cmap(i)) for i in range(cmap.N)]
 
-ax = sns.barplot(y=state_df['Cases'].head(10), x=state_df['State'].head(10), palette='winter')
+ax = sns.barplot(y=state_df['Cases'].head(10), x=state_df['State'].head(10), palette='viridis')
 ax1 = ax.twinx()
-sns.lineplot(data=state_df[:10], marker='o', x='State', y='Cases', color='white', alpha=.8)
 
 total = df.count()
 for i in ax.patches:
@@ -338,14 +334,16 @@ ax.tick_params(axis='x', which='major', labelsize=10.6, rotation=10)
 plt.show()
 '''
 ########################################################################################################################
-'''
+
+# Severity Analysis
+''' 
 severity_df = df.groupBy("Severity").agg(count("*").alias("Cases")).orderBy(col("Cases").desc())
-# Pandas'a dönüşüm
+# Transformation to Pandas
 severity_df_pd = severity_df.toPandas()
 
 fig, ax = plt.subplots(figsize=(12, 10), dpi=150)
 
-# Toplam vakaların yüzdesini hesaplayalım
+# Calculate the percentage of total cases
 total_cases = severity_df_pd['Cases'].sum()
 severity_df_pd['Percentage'] = (severity_df_pd['Cases'] / total_cases) * 100
 clrs = ['#b4e6ee', '#14a3ee', '#fdf4b8', '#ff4f4e']
@@ -380,7 +378,8 @@ fig.show()
 ########################################################################################################################
 
 # Road Condition Analysis
-fig, ((ax1, ax2), (ax3, ax4), (ax5, ax6), (ax7, ax8)) = plt.subplots(nrows=4, ncols=2, figsize=(16, 20))
+'''
+fig, ((ax1, ax2), (ax3, ax4), (ax5, ax6), (ax7, ax8)) = plt.subplots(nrows=4, ncols=2, figsize=(12, 20))
 
 road_conditions = ['Bump', 'Crossing', 'Give_Way', 'Junction', 'Stop', 'No_Exit', 'Traffic_Signal', 'Turning_Loop']
 colors = [('#004B95', '#519DE9'), ('#38812F', '#7CC674'), ('#005F60', '#73C5C5'), ('#7D1007', '#C9190B'),
@@ -414,6 +413,6 @@ for i in [ax1, ax2, ax3, ax4, ax5, ax6, ax7, ax8]:
 
     index += 1
 fig.show()
-
+'''
 # Spark Session'ı kapat
 spark.stop()
