@@ -9,7 +9,7 @@ warnings.filterwarnings('ignore')
 
 # Create Spark Session
 spark = SparkSession.builder \
-    .appName("Predict Severity") \
+    .appName("Filter DataFrame") \
     .getOrCreate()
 
 df = spark.read.csv("US_Accidents_March23.csv", header=True, inferSchema=True)

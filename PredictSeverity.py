@@ -19,26 +19,21 @@ warnings.filterwarnings('ignore')
 
 # Create Spark Session
 spark = SparkSession.builder \
-    .appName("Predict Severity2") \
+    .appName("Predict Severity") \
     .getOrCreate()
 
 df_sel_dropna = spark.read.csv("US_Accidents_March23_clean_sel_dropna.csv", header=True, inferSchema=True)
 
 # Choose the state
 state = 'CA'
-
 # Choose state as California
 df_state = df_sel_dropna.filter(col('State') == state).drop('State')
-
 # Set county
 county = 'Alameda'
-
 # Select the county of Alameda
 df_county = df_state.filter(col('County') == county).drop('County')
 
-
 df_county.show()
-
 
 # Convert Apache Spark DataFrame into Pandas DataFrame
 df_county_pd = df_county.toPandas()
