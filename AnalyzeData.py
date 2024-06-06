@@ -1,56 +1,38 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import hour, col, count, to_timestamp, desc
 
-# import all necesary libraries
-import numpy as np
+# import all necessary libraries
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import matplotlib.patches as mpatches
 import seaborn as sns
-import calendar
-import plotly as pt
-from plotly import graph_objs as go
-import plotly.express as px
-import plotly.figure_factory as ff
 from pylab import *
-import matplotlib.patheffects as PathEffects
 
-import descartes
 import geopandas as gpd
-from Levenshtein import distance
-from itertools import product
-from fuzzywuzzy import fuzz
-from fuzzywuzzy import process
-from scipy.spatial.distance import pdist, squareform
-from shapely.geometry import Point, Polygon
-
-import geoplot
-from geopy.geocoders import Nominatim
+from shapely.geometry import Point
 
 import warnings
 
 warnings.filterwarnings('ignore')
 
-# Spark Session oluştur
+# Create spark session
 spark = SparkSession.builder \
     .appName("Accident Analysis") \
     .getOrCreate()
 
-# Veriyi yükle
+# upload data
 df = spark.read.csv("US_Accidents_March23.csv", header=True, inferSchema=True)
 
-# Kolon ve satır sayısını kontrol et
+# check column and row size
 print("The Dataset Contains, Rows: {:,d} & Columns: {}".format(df.count(), len(df.columns)))
 
-# Tarih saat sütunlarını dönüştür
+# convert to timestamp
 df = df.withColumn("Start_Time", to_timestamp(col("Start_Time")))
 df = df.withColumn("End_Time", to_timestamp(col("End_Time")))
 
 
 ########################################################################################################################
 # City Analysis
-'''
+
 # Cities and number of accidents
 city_df = df.groupBy("City").agg(count("*").alias("Cases")).orderBy(col("Cases").desc())
 
@@ -62,7 +44,7 @@ print(round(highest_cases / (5 * 365)))
 # Top 10 cities
 top_10_cities = city_df.limit(10)
 
-# show reslults
+# show results
 top_10_cities.show()
 
 top_10_citiesPD = top_10_cities.toPandas()
@@ -102,11 +84,11 @@ top_side.set_visible(False)
 ax.set_axisbelow(True)
 ax.grid(color='#b2d6c7', linewidth=1, axis='y', alpha=.3)
 plt.show()
-'''
+
 
 ########################################################################################################################
 # Hour Analysis
-'''
+
 # Extract time information from the Start_Time column
 df_hours = df.withColumn("Hours", hour(col("Start_Time")))
 
@@ -163,9 +145,9 @@ NI = mpatches.Patch(color='#60154a', label='P.M.')
 ax.legend(handles=[MA, MO, NI], prop={'size': 10.5}, loc='upper left', borderpad=1, edgecolor='white');
 
 plt.show()
-'''
+
 ########################################################################################################################
-'''  
+
 # usa map severity graph made without spark
 
 df = pd.read_csv('./US_Accidents_March23.csv')
@@ -208,12 +190,12 @@ for i in ax:
 
 
 fig.show()
-'''
+
 
 ########################################################################################################################
 
 # State Analysis
-'''
+
 # create a dictionary using US State code and their corresponding Name
 us_states = {'AK': 'Alaska',
              'AL': 'Alabama',
@@ -332,11 +314,11 @@ ax.tick_params(axis='y', which='major', labelsize=10.6)
 ax.tick_params(axis='x', which='major', labelsize=10.6, rotation=10)
 
 plt.show()
-'''
+
 ########################################################################################################################
 
 # Severity Analysis
-''' 
+
 severity_df = df.groupBy("Severity").agg(count("*").alias("Cases")).orderBy(col("Cases").desc())
 # Transformation to Pandas
 severity_df_pd = severity_df.toPandas()
@@ -374,11 +356,11 @@ for p in ax.patches:
     ax.annotate(f'{height:.2f}%', (x + width / 2, y + height * 1.02), ha='center')
 
 fig.show()
-'''
+
 ########################################################################################################################
 
 # Road Condition Analysis
-'''
+
 fig, ((ax1, ax2), (ax3, ax4), (ax5, ax6), (ax7, ax8)) = plt.subplots(nrows=4, ncols=2, figsize=(12, 20))
 
 road_conditions = ['Bump', 'Crossing', 'Give_Way', 'Junction', 'Stop', 'No_Exit', 'Traffic_Signal', 'Turning_Loop']
@@ -413,6 +395,6 @@ for i in [ax1, ax2, ax3, ax4, ax5, ax6, ax7, ax8]:
 
     index += 1
 fig.show()
-'''
-# Spark Session'ı kapat
+
+# stop spark session
 spark.stop()
