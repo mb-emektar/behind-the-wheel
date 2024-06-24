@@ -1,0 +1,10 @@
+In order to make presentations go smooth, you should upload your slides before the presentation day. Your presentations will be at most 10 minutes long per project, followed by a 5 minutes Q&A. 
+
+In your presentation, you should
+
+-introduce your problem briefly, explain the dataset you use briefly. (1-2min)
+
+-describe your solution to the problem (4-5 min)
+
+-give your numerical/visual results together with your insights/conclusions. (3-4 min)
+
